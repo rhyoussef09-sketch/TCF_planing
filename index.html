@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Transcar Planing Mobile</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --bg-principal: #f4f6f9;
+            --azul-transcar: #1e293b;
+            --naranja-transcar: #f97316;
+            --card-bg: #ffffff;
+            --text-color: #334155;
+            --border-color: #e2e8f0;
+        }
+
+        /* Configuración para simular una App Móvil */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-principal);
+            color: var(--text-color);
+            padding-bottom: 90px; /* Espacio para el menú inferior */
+        }
+
+        /* Cabecera de la App */
+        header {
+            background-color: var(--azul-transcar);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* Contenedor de Tarjetas de Días */
+        .container {
+            padding: 15px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .day-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-left: 5px solid var(--naranja-transcar);
+            display: none; /* Se controlará por JavaScript para mostrar el día activo */
+        }
+
+        .day-card.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .day-title {
+            font-size: 1.1rem;
+            color: var(--azul-transcar);
+            font-weight: 700;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            text-transform: capitalize;
+        }
+
+        /* Filas de Turnos (Mañana / Tarde) */
+        .shift-section {
+            margin-bottom: 15px;
+        }
+
+        .shift-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Inputs estilo formulario móvil moderno */
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            background-color: #f8fafc;
+            color: var(--text-color);
+            transition: all 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--naranja-transcar);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
+        /* Input especial para Notas */
+        .notes-input {
+            grid-column: span 2;
+            background-color: #fffbeb !important;
+            border-color: #fef3c7 !important;
+        }
+
+        /* Botón de Guardar Flotante (Estilo App) */
+        .fab-save {
+            position: fixed;
+            bottom: 85px;
+            right: 20px;
+            background-color: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 1rem;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 99;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .fab-save:active {
+            transform: scale(0.95);
+        }
+
+        /* Barra de Navegación Inferior Táctil */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--azul-transcar);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 5px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .nav-btn .icon {
+            font-size: 1.2rem;
+        }
+
+        .nav-btn.active {
+            color: var(--naranja-transcar);
+        }
+
+        /* Indicador de carga */
+        .loading-toast {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 41, 59, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>TRANSCAR PLANING</h1>
+    </header>
+
+    <div id="loading" class="loading-toast">Sincronizando...</div>
+
+    <div class="container" id="cards-container">
+        </div>
+
+    <button class="fab-save" onclick="guardarPlaning()">
+        💾 GUARDAR
+    </button>
+
+    <nav class="bottom-nav" id="bottom-navigation">
+        </nav>
+
+    <script>
+        // ===================================================
+        // CONFIGURACIÓN DE TU BASE DE DATOS SUPABASE
+        // ===================================================
+        const SUPABASE_URL = "https://yzoqnuawxnyybwgzgtlm.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_6t_P3nZ_AQUÍ_TU_KEY_COMPLETA"; 
+        
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Configuración de los días en francés como me pediste
+        const diasSemana = [
+            { id: "lun", label: "Lundi" },
+            { id: "mar", label: "Mardi" },
+            { id: "mer", label: "Mercredi" },
+            { id: "jeu", label: "Jeudi" },
+            { id: "ven", label: "Vendredi" },
+            { id: "sam", label: "Samedi" }
+        ];
+
+        let diaActualActivo = "lun";
+
+        // Generar la interfaz móvil
+        function inicializarApp() {
+            const container = document.getElementById("cards-container");
+            const nav = document.getElementById("bottom-navigation");
+            
+            container.innerHTML = "";
+            nav.innerHTML = "";
+
+            diasSemana.forEach((dia, index) => {
+                // 1. Crear Tarjeta del Día
+                const isActive = dia.id === diaActualActivo ? "active" : "";
+                const cardHtml = `
+                    <div class="day-card ${isActive}" id="card-${dia.id}">
+                        <div class="day-title">${dia.label}</div>
+                        
+                        <div class="shift-section">
+                            <div class="shift-title">☀️ Matin</div>
+                            <div class="input-group">
+                                <input type="text" id="${dia.id}_matin_chofer" placeholder="Chauffeur">
+                                <input type="text" id="${dia.id}_matin_camion" placeholder="Camion">
+                                <input type="text" class="notes-input" id="${dia.id}_matin_note" placeholder="Notes Matin">
+                            </div>
+                        </div>
+
+                        <div class="shift-section">
+                            <div class="shift-title">🌙 Après-midi</div>
+                            <div class="input-group">
+                                <input type="text" id="${dia.id}_am_chofer" placeholder="Chauffeur">
+                                <input type="text" id="${dia.id}_am_camion" placeholder="Camion">
+                                <input type="text" class="notes-input" id="${dia.id}_am_note" placeholder="Notes Après-midi">
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+
+                // 2. Crear Botón en la Barra Inferior
+                const navBtnActive = dia.id === diaActualActivo ? "active" : "";
+                const btnHtml = `
+                    <button class="nav-btn ${navBtnActive}" id="btn-${dia.id}" onclick="cambiarDia('${dia.id}')">
+                        <span class="icon">${dia.label.substring(0,2)}</span>
+                        <span>${dia.label}</span>
+                    </button>
+                `;
+                nav.innerHTML += btnHtml;
+            });
+
+            descargarPlaning();
+        }
+
+        // Cambiar de pestaña de día
+        function cambiarDia(diaId) {
+            document.querySelectorAll('.day-card').forEach(card => card.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(`card-${diaId}`).classList.add('active');
+            document.getElementById(`btn-${diaId}`).classList.add('active');
+            diaActualActivo = diaId;
+        }
+
+        // Mostrar aviso de sincronización
+        function mostrarCargando(texto, tiempo = 2000) {
+            const toast = document.getElementById("loading");
+            toast.innerText = texto;
+            toast.style.display = "block";
+            if (tiempo > 0) {
+                setTimeout(() => { toast.style.display = "none"; }, tiempo);
+            }
+        }
+
+        function ocultarCargando() {
+            document.getElementById("loading").style.display = "none";
+        }
+
+        // GUARDAR EN SUPABASE
+        async function guardarPlaning() {
+            mostrarCargando("Enregistrement...", 0);
+            
+            const inputs = document.querySelectorAll("input[type='text']");
+            const dataToSave = [];
+
+            inputs.forEach(input => {
+                dataToSave.push({ key: input.id, value: input.value });
+            });
+
+            try {
+                for (const item of dataToSave) {
+                    // Primero intentamos borrar si ya existe para evitar duplicados
+                    await _supabase.from("transcar_data").delete().eq("key", item.key);
+                    // Insertamos el valor actual
+                    if (item.value.trim() !== "") {
+                        await _supabase.from("transcar_data").insert([{ key: item.key, value: item.value }]);
+                    }
+                }
+                mostrarCargando("✅ Enregistré avec succès !");
+            } catch (error) {
+                console.error(error);
+                mostrarCargando("❌ Erreur de sauvegarde");
+            }
+        }
+
+        // DESCARGAR DE SUPABASE
+        async function descargarPlaning() {
+            mostrarCargando("Chargement du planning...", 0);
+            try {
+                const { data, error } = await _supabase.from("transcar_data").select("key, value");
+                
+                if (error) throw error;
+
+                if (data) {
+                    data.forEach(item => {
+                        const input = document.getElementById(item.key);
+                        if (input) {
+                            input.value = item.value;
+                        }
+                    });
+                }
+                ocultarCargando();
+            } catch (error) {
+                console.error(error);
+                mostrarCargando("❌ Erreur de chargement");
+            }
+        }
+
+        // Arrancar la App al abrir la web
+        window.onload = inicializarApp;
+    </script>
+</body>
+</html>
